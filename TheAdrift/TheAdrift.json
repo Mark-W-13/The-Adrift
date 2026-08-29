@@ -1,0 +1,18 @@
+{
+  "id": "TheAdrift",
+  "name": "彷徨者 The Adrift",
+  "pck_name": "TheAdrift",
+  "author": "The Adrift",
+  "description": "一个在尖塔中追求天国的女孩。使用金钱与诅咒的力量。",
+  "version": "0.1.0",
+  "has_pck": true,
+  "has_dll": true,
+  "affects_gameplay": true,
+  "min_game_version": "0.111.0",
+  "dependencies": [
+    {
+      "id": "STS2-RitsuLib",
+      "version": "0.5.15"
+    }
+  ]
+}

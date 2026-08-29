@@ -1,0 +1,21 @@
+{
+  "THE_ADRIFT_CHARACTER_THE_ADRIFT_CHARACTER.aromaPrinciple": "[sine][blue]正义的时代会来临，希望的歌也会有的……[/blue][/sine]",
+  "THE_ADRIFT_CHARACTER_THE_ADRIFT_CHARACTER.banter.alive.endTurnPing": "……继续走吧。",
+  "THE_ADRIFT_CHARACTER_THE_ADRIFT_CHARACTER.banter.dead.endTurnPing": "……我还在路上。",
+  "THE_ADRIFT_CHARACTER_THE_ADRIFT_CHARACTER.cardsModifierDescription": "彷徨者的卡牌现在会出现在奖励和商店中。",
+  "THE_ADRIFT_CHARACTER_THE_ADRIFT_CHARACTER.cardsModifierTitle": "彷徨者卡牌",
+  "THE_ADRIFT_CHARACTER_THE_ADRIFT_CHARACTER.description": "在尖塔中追求[gold]天国[/gold]的女孩。\n曾经拥有坚定的理想，如今却不得不使用[gold]金钱[/gold]与[purple]诅咒[/purple]的力量。",
+  "THE_ADRIFT_CHARACTER_THE_ADRIFT_CHARACTER.eventDeathPrevention": "……再往前一步，就是天国了。",
+  "THE_ADRIFT_CHARACTER_THE_ADRIFT_CHARACTER.flavor": "世界边缘的漫游者。",
+  "THE_ADRIFT_CHARACTER_THE_ADRIFT_CHARACTER.goldMonologue": "你从没有在同一个地方见到过这么多金币！恐怕商人的所有商品都能被买下来…纽约也不是绝对不能去的地方吧…危险的歹徒也可以用钱收买消灾…这些无比贪婪的念头，会永远萦绕在你脑中……",
+  "THE_ADRIFT_CHARACTER_THE_ADRIFT_CHARACTER.possessiveAdjective": "她的",
+  "THE_ADRIFT_CHARACTER_THE_ADRIFT_CHARACTER.pronounObject": "她",
+  "THE_ADRIFT_CHARACTER_THE_ADRIFT_CHARACTER.pronounPossessive": "她的",
+  "THE_ADRIFT_CHARACTER_THE_ADRIFT_CHARACTER.pronounSubject": "她",
+  "THE_ADRIFT_CHARACTER_THE_ADRIFT_CHARACTER.selectMessage": "彷徨者准备好了。",
+  "THE_ADRIFT_CHARACTER_THE_ADRIFT_CHARACTER.title": "彷徨者",
+  "THE_ADRIFT_CHARACTER_THE_ADRIFT_CHARACTER.titleObject": "彷徨者",
+  "THE_ADRIFT_CHARACTER_THE_ADRIFT_CHARACTER.victoryMessage": "天国……还有多远？",
+  "THE_ADRIFT_CHARACTER_THE_ADRIFT_CHARACTER.unlockText": "用[pink]{Prerequisite}[/pink]进行一局游戏来解锁这个角色。",
+  "SEA_GLASS.THE_ADRIFT_CHARACTER_THE_ADRIFT_CHARACTER.title": "落日玻璃"
+}
