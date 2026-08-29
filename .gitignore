@@ -3,12 +3,7 @@ _tools/
 nuget-feed/
 local.props
 
-# 教程与参考
-SlayTheSpire2ModdingTutorials/
-_vanilla_ref/
-
 # 构建产物与打包
-TheAdrift_分享包/
 The_Adrift/
 The_Adrift.zip
 TheAdrift/TheAdrift.pck
@@ -16,10 +11,8 @@ TheAdrift/bin/
 TheAdrift/obj/
 TheAdrift/.godot/
 
-# 原始素材与工作文件
+# 原始美术素材
 The_Adrift_Material/
-能量图标.png
-work-list*.txt
 
 # IDE
 .vs/
