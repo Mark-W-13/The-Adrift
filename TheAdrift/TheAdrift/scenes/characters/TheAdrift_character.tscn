@@ -14,9 +14,9 @@ texture = ExtResource("1_battle")
 unique_name_in_owner = true
 layout_mode = 3
 anchors_preset = 0
-offset_left = -70.0
+offset_left = -99.0
 offset_top = -160.0
-offset_right = 70.0
+offset_right = 99.0
 offset_bottom = 100.0
 
 [node name="IntentPos" type="Marker2D" parent="."]
