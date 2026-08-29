@@ -1,3 +1,4 @@
+using MegaCrit.Sts2.Core.CardSelection;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
@@ -247,18 +248,21 @@ public sealed class Ascend  : AdriftCardTemplate
 
     protected override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay)
     {
-        var hand = CardUtils.Hand(Owner);
-        if (hand is { Count: > 0 })
+        // 参考原版「武装」：未升级弹选择界面选 1 张，升级后升级全部可升级牌（带升级动画预览）
+        if (IsUpgraded)
         {
-            if (IsUpgraded)
+            var hand = CardUtils.Hand(Owner);
+            if (hand is { Count: > 0 })
             {
-                foreach (var card in hand)
-                    CardCmd.Upgrade(card, CardPreviewStyle.None);
+                foreach (var card in hand.Where(c => c.IsUpgradable))
+                    CardCmd.Upgrade(card);
             }
-            else
-            {
-                CardCmd.Upgrade(hand[Owner.RunState.Rng.CombatTargets.NextInt(hand.Count)], CardPreviewStyle.None);
-            }
+        }
+        else
+        {
+            var card = await CardSelectCmd.FromHandForUpgrade(choiceContext, Owner, this);
+            if (card is not null)
+                CardCmd.Upgrade(card);
         }
 
         await CardUtils.AddToHand(choiceContext, Owner, CardUtils.Canonical<AscendersBane>());
@@ -303,21 +307,24 @@ public sealed class ForgettingYou  : AdriftCardTemplate
 
     protected override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay)
     {
-        var hand = CardUtils.Hand(Owner)?.Where(c => c != this).ToList();
-        if (hand is { Count: > 0 })
+        // 弹选择界面选 2 张手牌（按选择顺序：第 1 张变化为打击，第 2 张变化为防御）
+        var chosen = (await CardSelectCmd.FromHand(choiceContext, Owner,
+            new CardSelectorPrefs(CardSelectorPrefs.TransformSelectionPrompt, 2),
+            c => c != this, this)).ToList();
+        if (chosen.Count > 0)
         {
-            // 前 2 张手牌分别变化为 打击(+) 与 防御(+)
-            var chosen = hand.Take(2).ToList();
             if (IsUpgraded)
-            {
                 await CardUtils.TransformIntoUpgraded<TheAdriftStrike>(choiceContext, chosen[0], Owner);
-                await CardUtils.TransformIntoUpgraded<TheAdriftDefend>(choiceContext, chosen[1], Owner);
-            }
             else
-            {
                 await CardUtils.TransformInto<TheAdriftStrike>(choiceContext, chosen[0]);
+        }
+
+        if (chosen.Count > 1)
+        {
+            if (IsUpgraded)
+                await CardUtils.TransformIntoUpgraded<TheAdriftDefend>(choiceContext, chosen[1], Owner);
+            else
                 await CardUtils.TransformInto<TheAdriftDefend>(choiceContext, chosen[1]);
-            }
         }
 
         await CardUtils.AddToHand(choiceContext, Owner, CardUtils.Canonical<Decay>());
@@ -359,7 +366,10 @@ public sealed class ClearStream  : AdriftCardTemplate
     protected override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay)
     {
         await CreatureCmd.GainBlock(Owner.Creature, DynamicVars.Block, cardPlay);
-        var curse = CardUtils.FirstCurseInHand(Owner);
+        // 「消耗手牌中的 1 张诅咒牌」→ 弹选择界面（非随机）
+        var curse = (await CardSelectCmd.FromHand(choiceContext, Owner,
+            new CardSelectorPrefs(CardSelectorPrefs.ExhaustSelectionPrompt, 1),
+            c => c.Type == CardType.Curse, this)).FirstOrDefault();
         if (curse is not null)
             await CardCmd.Exhaust(choiceContext, curse, false, false);
     }

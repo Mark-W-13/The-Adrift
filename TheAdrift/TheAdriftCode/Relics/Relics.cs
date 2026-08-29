@@ -9,9 +9,11 @@ using MegaCrit.Sts2.Core.Localization.DynamicVars;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Cards;
 using MegaCrit.Sts2.Core.Models.Powers;
+using MegaCrit.Sts2.Core.Models.Relics;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
 using MegaCrit.Sts2.Core.Rewards;
 using MegaCrit.Sts2.Core.Rooms;
+using MegaCrit.Sts2.Core.Runs;
 using MegaCrit.Sts2.Core.ValueProps;
 using TheAdrift.Characters;
 using TheAdrift.Common;
@@ -23,6 +25,12 @@ namespace TheAdrift.Relics;
 /// <summary>
 ///     搬史群 —— 初始遗物：第一个卡牌奖励将是被升级过的；若拾取，向卡组加入 1 张随机诅咒。
 /// </summary>
+/// <remarks>
+///     与原版「白银熔炉」（SilverCrucible，前 3 次升级）同时持有时的协调：
+///     升级判定改用与白银熔炉相同的 <see cref="TryModifyCardRewardOptionsLate" /> 机制，
+///     且当白银熔炉尚未用完时主动让路，等它的 3 次耗尽后再用掉自己的 1 次，
+///     从而保证叠加时前 4 次卡牌奖励都是升级过的（而不是互相重叠只升级 3 次）。
+/// </remarks>
 [RegisterRelic(typeof(TheAdriftRelicPool))]
 [RegisterCharacterStarterRelic(typeof(TheAdriftCharacter))]
 public sealed class BanShiQun : ModRelicTemplate
@@ -36,15 +44,47 @@ public sealed class BanShiQun : ModRelicTemplate
         IconOutlinePath: $"{Entry.ResPath}/images/relics/{GetType().Name}.png",
         BigIconPath: $"{Entry.ResPath}/images/relics/{GetType().Name}.png");
 
-    /// <summary>第一个卡牌奖励 100% 升级。</summary>
-    public override decimal ModifyCardRewardUpgradeOdds(Player player, CardModel card, decimal odds)
+    /// <summary>玩家是否还持有未用完的白银熔炉（其前 3 次卡牌奖励升级尚未耗尽）。</summary>
+    private static bool SilverCrucibleStillActive(Player player)
     {
-        if (!_firstRewardDone)
-            return 1m;
-        return odds;
+        foreach (var relic in player.Relics)
+        {
+            if (relic is SilverCrucible { } silver && silver.TimesUsed < silver.DynamicVars.Cards.IntValue)
+                return true;
+        }
+
+        return false;
     }
 
-    /// <summary>拾取卡牌奖励后：加入随机诅咒，并标记首次完成。</summary>
+    /// <summary>
+    ///     直接升级本次卡牌奖励（与白银熔炉同机制）。白银熔炉未用完时让路，
+    ///     避免与它的 3 次重叠；自己的 1 次在其耗尽后再触发。
+    /// </summary>
+    public override bool TryModifyCardRewardOptionsLate(Player player, List<CardCreationResult> cardRewards, CardCreationOptions options)
+    {
+        if (_firstRewardDone || player != Owner) return false;
+        if (!options.Flags.HasFlag(CardCreationFlags.IsCardReward)) return false;
+        if (SilverCrucibleStillActive(player)) return false;
+
+        var upgradedAny = false;
+        foreach (var cardReward in cardRewards)
+        {
+            var card = cardReward.Card;
+            if (card.IsUpgradable && !card.IsUpgraded)
+            {
+                var upgraded = player.RunState.CloneCard(card);
+                CardCmd.Upgrade(upgraded);
+                cardReward.ModifyCard(upgraded, this);
+                upgradedAny = true;
+            }
+        }
+
+        if (upgradedAny)
+            _firstRewardDone = true;
+        return upgradedAny;
+    }
+
+    /// <summary>拾取卡牌奖励后：若首次完成标记尚未置位，加入随机诅咒并标记。</summary>
     public override async Task AfterRewardTaken(Player player, Reward reward)
     {
         if (reward is not CardReward) return;

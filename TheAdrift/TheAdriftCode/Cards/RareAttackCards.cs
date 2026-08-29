@@ -1,4 +1,6 @@
 using MegaCrit.Sts2.Core.Commands;
+using MegaCrit.Sts2.Core.Combat;
+using MegaCrit.Sts2.Core.Combat.History.Entries;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Rooms;
@@ -22,7 +24,6 @@ namespace TheAdrift.Cards;
 
 /// <summary>落阳 —— 12 费。造成 75(99) 点伤害。无论何处，你每有 1 张诅咒牌，这张牌的耗能就减少 1。</summary>
 [RegisterCard(typeof(TheAdriftCardPool))]
-[RegisterDefaultModelCapability(typeof(SettingSunCost))]
 public sealed class SettingSun  : AdriftCardTemplate
 {
     protected override IEnumerable<DynamicVar> CanonicalVars => [new DamageVar(75, ValueProp.Move)];
@@ -41,6 +42,7 @@ public sealed class SettingSun  : AdriftCardTemplate
 
 /// <summary>落阳减费能力：你拥有的诅咒牌数量（卡组+手牌+牌堆）。</summary>
 [RegisterModelCapability]
+[RegisterDefaultModelCapability(typeof(SettingSun))]
 public sealed class SettingSunCost : CardCapability, ICardEnergyCostContributor
 {
     public int ModifyEnergyCost(CardModel card, int currentCost, CostModifiers modifiers)
@@ -190,29 +192,33 @@ public sealed class WhoLitTheWorld  : AdriftCardTemplate
 [RegisterCard(typeof(TheAdriftCardPool))]
 public sealed class EndOfHistory  : AdriftCardTemplate
 {
-    protected override IEnumerable<DynamicVar> CanonicalVars => [new DamageVar(6, ValueProp.Move)];
+    /// <summary>参考原版「谋杀」：用战斗历史计数打出过的打击/防御，天然支持伤害预览。</summary>
+    protected override IEnumerable<DynamicVar> CanonicalVars =>
+    [
+        new CalculationBaseVar(6m),
+        new ExtraDamageVar(4m),
+        new CalculatedDamageVar(ValueProp.Move).WithMultiplier((card, _) =>
+            CombatManager.Instance.History.Entries.OfType<CardPlayStartedEntry>()
+                .Count(e => e.Actor == card.Owner?.Creature &&
+                            (e.CardPlay.Card.Tags.Contains(CardTag.Strike) || e.CardPlay.Card.Tags.Contains(CardTag.Defend))))
+    ];
 
     public override IEnumerable<CardKeyword> CanonicalKeywords => [CardKeyword.Eternal];
 
     public EndOfHistory() : base(0, CardType.Attack, CardRarity.Rare, TargetType.AnyEnemy) { }
 
-    /// <summary>进入战斗时挂上计数能力（打击/防御打出次数）。</summary>
-    public override async Task AfterCardEnteredCombat(CardModel card)
-    {
-        if (card == this)
-            await PowerCmd.Apply<EndOfHistoryCounterPower>(new ThrowingPlayerChoiceContext(), [Owner.Creature], 1, Owner.Creature, this);
-    }
-
     protected override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay)
     {
         ArgumentNullException.ThrowIfNull(cardPlay.Target);
-        var played = EndOfHistoryCounterPower.GetCount(Owner.Creature);
-        var bonus = (IsUpgraded ? 5 : 4) * played;
-        await DamageCmd.Attack(DynamicVars.Damage.BaseValue + bonus).FromCard(this, cardPlay)
+        await DamageCmd.Attack(DynamicVars.CalculatedDamage).FromCard(this, cardPlay)
             .Targeting(cardPlay.Target).Execute(choiceContext);
     }
 
-    protected override void OnUpgrade() => DynamicVars.Damage.UpgradeValueBy(1);
+    protected override void OnUpgrade()
+    {
+        DynamicVars.CalculationBase.UpgradeValueBy(1m);
+        DynamicVars.ExtraDamage.UpgradeValueBy(1m);
+    }
 }
 
 /// <summary>苦旅 —— 固有。造成等同于你已攀爬过楼层的伤害。消耗。</summary>

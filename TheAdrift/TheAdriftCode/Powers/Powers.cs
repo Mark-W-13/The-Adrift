@@ -1,3 +1,4 @@
+using MegaCrit.Sts2.Core.CardSelection;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Entities.Cards;
@@ -190,9 +191,9 @@ public sealed class NightOfTheWorldPower : ModPowerTemplate
         _cursesThisTurn = 0;
         var player = Owner.Player;
         await CardPileCmd.Draw(choiceContext, Amount, player);
-        var hand = CardUtils.Hand(player);
-        if (hand is null) return;
-        var toExhaust = hand.Take(2).ToList();
+        // 「消耗 2 张手牌」→ 弹选择界面（非随机）
+        var toExhaust = (await CardSelectCmd.FromHand(choiceContext, player,
+            new CardSelectorPrefs(CardSelectorPrefs.ExhaustSelectionPrompt, 2), null, this)).ToList();
         foreach (var c in toExhaust)
             await CardCmd.Exhaust(choiceContext, c, false, false);
     }
@@ -267,7 +268,8 @@ public sealed class ElectricBikePower : ModPowerTemplate
 
     public override async Task AfterPlayerTurnStart(PlayerChoiceContext choiceContext, Player player)
     {
-        if (player.Creature != Owner) return;
+        // 与原版「工具箱」同款判断：确认是 power 所属玩家的回合
+        if (player != Owner.Player) return;
         await PlayerCmd.GainGold(Amount, player, true);
     }
 }
@@ -409,6 +411,11 @@ public sealed class SymbolicFormPower : ModPowerTemplate
 }
 
 /// <summary>阵亡形态 —— 生命值将要降到 0 或以下时，消耗全部诅咒牌并恢复等量生命（1 次）。</summary>
+/// <remarks>
+///     参考原版「瓶中精灵」/ MockPreventDeathPower：防死机制是 <c>ShouldDie</c> 返回 false 阻止死亡，
+///     再由 <c>AfterPreventingDeath</c> 执行恢复。旧的 ModifyHpLostAfterOstyLate 是奥斯蒂（Osty）专用
+///     钩子，不参与普通死亡判定，因此之前完全无效。
+/// </remarks>
 [RegisterPower]
 public sealed class DeathFormPower : ModPowerTemplate
 {
@@ -416,30 +423,39 @@ public sealed class DeathFormPower : ModPowerTemplate
     public override PowerStackType StackType => PowerStackType.Single;
 
     private bool _used;
-    private bool _prevented;
 
     public override PowerAssetProfile AssetProfile => new(
         IconPath: $"{Entry.ResPath}/images/powers/{GetType().Name}.png",
         BigIconPath: $"{Entry.ResPath}/images/powers/{GetType().Name}.png");
 
-    public override decimal ModifyHpLostAfterOstyLate(Creature target, decimal damage, ValueProp props,
-        Creature attacker, CardModel? cardSource)
+    /// <summary>手牌/抽牌堆/弃牌堆中是否有可消耗的诅咒。</summary>
+    private bool HasCurseToConsume(Player player)
     {
-        if (_used || target != Owner || damage <= 0) return damage;
-        if (target.CurrentHp - damage <= 0)
+        foreach (var pileType in new[] { PileType.Hand, PileType.Draw, PileType.Discard })
         {
-            _used = true;
-            _prevented = true;
-            return 0;
+            var pile = CardPile.Get(pileType, player);
+            if (pile is { } p && p.Cards.Any(c => c.Type == CardType.Curse))
+                return true;
         }
-        return damage;
+
+        return false;
     }
 
-    public override async Task AfterPreventingDeath(Creature target)
+    public override bool ShouldDie(Creature creature)
     {
-        if (target != Owner || !_prevented) return;
-        _prevented = false;
+        // 已用过、或不是自己、或没有诅咒可消耗时不阻止死亡
+        if (_used || creature != Owner) return true;
         var player = Owner.Player;
+        if (player is null) return true;
+        return !HasCurseToConsume(player);
+    }
+
+    public override async Task AfterPreventingDeath(Creature creature)
+    {
+        if (creature != Owner || _used) return;
+        _used = true;
+        var player = Owner.Player;
+        if (player is null) return;
         var exhausted = 0;
         foreach (var pileType in new[] { PileType.Hand, PileType.Draw, PileType.Discard })
         {
@@ -454,6 +470,9 @@ public sealed class DeathFormPower : ModPowerTemplate
 
         if (exhausted > 0)
             await CreatureCmd.Heal(Owner, exhausted);
+
+        // 一次性效果：用完移除自身（参考 MockPreventDeathPower）
+        await PowerCmd.Remove(this);
     }
 }
 

@@ -72,7 +72,6 @@ public sealed class RawStone  : AdriftCardTemplate
 
 /// <summary>野蛮不眠 —— 对所有敌人造成 21(26) 点伤害。你的手牌每有 1 张诅咒牌，这张牌的耗能就减少 1。</summary>
 [RegisterCard(typeof(TheAdriftCardPool))]
-[RegisterDefaultModelCapability(typeof(SavageInsomniaCost))]
 public sealed class SavageInsomnia  : AdriftCardTemplate
 {
     protected override IEnumerable<DynamicVar> CanonicalVars => [new DamageVar(21, ValueProp.Move)];
@@ -89,6 +88,7 @@ public sealed class SavageInsomnia  : AdriftCardTemplate
 
 /// <summary>野蛮不眠的减费能力：手牌每有 1 张诅咒牌，耗能减少 1。</summary>
 [RegisterModelCapability]
+[RegisterDefaultModelCapability(typeof(SavageInsomnia))]
 public sealed class SavageInsomniaCost : CardCapability, ICardEnergyCostContributor
 {
     public int ModifyEnergyCost(CardModel card, int currentCost, CostModifiers modifiers)
@@ -185,11 +185,13 @@ public sealed class Appeal  : AdriftCardTemplate
         await DamageCmd.Attack(DynamicVars.Damage.BaseValue).FromCard(this, cardPlay)
             .Targeting(cardPlay.Target).Execute(choiceContext);
 
-        var drawPile = CardPile.Get(PileType.Draw, Owner);
-        while (CardUtils.CurseCountInHand(Owner) == 0 && drawPile.Cards.Count > 0)
+        // 参考原版「劫掠」：单张 Draw 重载内部处理洗牌（抽空弃牌堆自动洗回），抽到诅咒或抽空为止
+        CardModel? drawn;
+        do
         {
-            await CardPileCmd.Draw(choiceContext, 1, Owner);
+            drawn = await CardPileCmd.Draw(choiceContext, Owner);
         }
+        while (drawn != null && CardUtils.CurseCountInHand(Owner) == 0);
     }
 
     protected override void OnUpgrade() => DynamicVars.Damage.UpgradeValueBy(3);

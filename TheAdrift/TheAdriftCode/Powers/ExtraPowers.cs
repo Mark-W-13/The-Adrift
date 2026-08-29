@@ -125,7 +125,8 @@ public sealed class AscensionPower : ModPowerTemplate
     public override async Task AfterCardEnteredCombat(CardModel card)
     {
         if (card.Tags.Contains(CardTag.Strike) || card.Tags.Contains(CardTag.Defend))
-            CardCmd.Enchant(new AscensionEnchantment(), card, 1);
+            // 用泛型 Enchant 走 ModelDb canonical + ToMutable 标准路径（直接 new 实例会因 Id 未注册而无法生效）
+            CardCmd.Enchant<AscensionEnchantment>(card, 1);
     }
 }
 

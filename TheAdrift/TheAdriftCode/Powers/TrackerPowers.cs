@@ -15,36 +15,6 @@ using STS2RitsuLib.Scaffolding.Content;
 
 namespace TheAdrift.Powers;
 
-/// <summary>历史终结的计数能力：记录本场战斗打出过的打击/防御次数。</summary>
-[RegisterPower]
-public sealed class EndOfHistoryCounterPower : ModPowerTemplate
-{
-    public override PowerType Type => PowerType.Buff;
-    public override PowerStackType StackType => PowerStackType.Single;
-
-    private int _count;
-
-    public override PowerAssetProfile AssetProfile => new(
-        IconPath: $"{Entry.ResPath}/images/powers/{GetType().Name}.png",
-        BigIconPath: $"{Entry.ResPath}/images/powers/{GetType().Name}.png");
-
-    public static int GetCount(Creature creature)
-        => creature.GetPower<EndOfHistoryCounterPower>() is { } p ? p._count : 0;
-
-    public override async Task AfterCardPlayed(PlayerChoiceContext choiceContext, CardPlay cardPlay)
-    {
-        if (cardPlay.Player.Creature == Owner &&
-            (cardPlay.Card.Tags.Contains(CardTag.Strike) || cardPlay.Card.Tags.Contains(CardTag.Defend)))
-            _count++;
-    }
-
-    public override async Task AfterSideTurnEnd(PlayerChoiceContext choiceContext, CombatSide side,
-        IEnumerable<Creature> participants)
-    {
-        // 战斗结束时自动移除（临时能力语义）
-    }
-}
-
 /// <summary>冰红茶（药水）：接下来 5 个回合开始时获得 4 金币。</summary>
 [RegisterPower]
 public sealed class IcedBlackTeaPower : ModPowerTemplate

@@ -1,3 +1,4 @@
+using MegaCrit.Sts2.Core.CardSelection;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
@@ -30,18 +31,18 @@ public sealed class Audit  : AdriftCardTemplate
 
     protected override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay)
     {
+        // 参考原版「冲锋」：从抽牌堆中选择诅咒牌（最多 Magic 张），弃掉后抽等量
         var drawPile = CardPile.Get(PileType.Draw, Owner);
-        var max = DynamicVars["Magic"].BaseValue;
-        var curses = drawPile.Cards.Where(c => c.Type == CardType.Curse).Take((int)max).ToList();
-        var drawn = 0;
-        foreach (var curse in curses)
-        {
-            await CardCmd.Discard(choiceContext, curse);
-            drawn++;
-        }
+        var max = (int)DynamicVars["Magic"].BaseValue;
+        var selection = (await CardSelectCmd.FromCombatPile(choiceContext, drawPile, Owner,
+            new CardSelectorPrefs(CardSelectorPrefs.DiscardSelectionPrompt, 0, max),
+            c => c.Type == CardType.Curse)).ToList();
 
-        if (drawn > 0)
-            await CardPileCmd.Draw(choiceContext, drawn, Owner);
+        foreach (var curse in selection)
+            await CardCmd.Discard(choiceContext, curse);
+
+        if (selection.Count > 0)
+            await CardPileCmd.Draw(choiceContext, selection.Count, Owner);
     }
 
     protected override void OnUpgrade() => DynamicVars["Magic"].UpgradeValueBy(1);
@@ -118,7 +119,10 @@ public sealed class MovingMountains  : AdriftCardTemplate
 
     protected override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay)
     {
-        var curse = CardUtils.FirstCurseInHand(Owner);
+        // 「手牌中的 1 张诅咒牌」→ 弹选择界面（非随机）
+        var curse = (await CardSelectCmd.FromHand(choiceContext, Owner,
+            new CardSelectorPrefs(CardSelectorPrefs.TransformSelectionPrompt, 1),
+            c => c.Type == CardType.Curse, this)).FirstOrDefault();
         if (curse is not null)
         {
             if (IsUpgraded)

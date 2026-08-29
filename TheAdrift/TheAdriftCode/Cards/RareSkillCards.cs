@@ -84,7 +84,7 @@ public sealed class HeavenAndEarthBank  : AdriftCardTemplate
     }
 }
 
-/// <summary>默示录 —— 手牌每有 1 张诅咒，获得 1 费并抽 1 张牌。立即触发手牌所有诅咒的回合结束效果，并将它们消耗。消耗。</summary>
+/// <summary>默示录 —— 手牌每有 1 张诅咒，获得 1 费并抽 1 张牌。立即触发手牌所有诅咒的回合结束效果（，并将它们消耗）。消耗。</summary>
 [RegisterCard(typeof(TheAdriftCardPool))]
 public sealed class Apocalypse  : AdriftCardTemplate
 {
@@ -108,7 +108,9 @@ public sealed class Apocalypse  : AdriftCardTemplate
         {
             if (curse.HasTurnEndInHandEffect)
                 await curse.OnTurnEndInHandWrapper(choiceContext);
-            await CardCmd.Exhaust(choiceContext, curse, false, false);
+            // 只有升级后才会消耗诅咒（设计文档：括号内「并将它们消耗」为升级内容）
+            if (IsUpgraded)
+                await CardCmd.Exhaust(choiceContext, curse, false, false);
         }
     }
 }
@@ -119,7 +121,14 @@ public sealed class ClassConsciousness  : AdriftCardTemplate
 {
     public override bool GainsBlock => true;
 
-    protected override IEnumerable<DynamicVar> CanonicalVars => [new BlockVar(30m, ValueProp.Move)];
+    /// <summary>参考原版「蜃景」：CalculatedBlockVar 动态计算格挡并实时预览（金币变化时更新）。</summary>
+    protected override IEnumerable<DynamicVar> CanonicalVars =>
+    [
+        new CalculationBaseVar(0m),
+        new CalculationExtraVar(1m),
+        new CalculatedBlockVar(ValueProp.Move).WithMultiplier((card, _) =>
+            Math.Max(0, 30 - (card.Owner?.Gold ?? 0)))
+    ];
 
     public override IEnumerable<CardKeyword> CanonicalKeywords => [CardKeyword.Exhaust];
 
@@ -127,8 +136,8 @@ public sealed class ClassConsciousness  : AdriftCardTemplate
 
     protected override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay)
     {
-        var block = Math.Max(0, 30 - Owner.Gold);
-        await CreatureCmd.GainBlock(Owner.Creature, new BlockVar(block, ValueProp.Move), cardPlay);
+        await CreatureCmd.GainBlock(Owner.Creature, DynamicVars.CalculatedBlock.Calculate(cardPlay.Target),
+            DynamicVars.CalculatedBlock.Props, cardPlay);
     }
 
     protected override void OnUpgrade() => RemoveKeyword(CardKeyword.Exhaust);
@@ -291,18 +300,21 @@ public sealed class SpireChristmas  : AdriftCardTemplate
         var other = Owner.RunState.Players.FirstOrDefault(p => p != Owner);
         if (other is not null)
         {
-            var hand = CardUtils.Hand(other);
-            if (hand is { Count: > 0 })
+            // 与登神同款：未升级由另一名玩家选择 1 张升级，升级后升级全部可升级牌
+            if (IsUpgraded)
             {
-                if (IsUpgraded)
+                var hand = CardUtils.Hand(other);
+                if (hand is { Count: > 0 })
                 {
-                    foreach (var card in hand)
-                        CardCmd.Upgrade(card, CardPreviewStyle.None);
+                    foreach (var card in hand.Where(c => c.IsUpgradable))
+                        CardCmd.Upgrade(card);
                 }
-                else
-                {
-                    CardCmd.Upgrade(hand[other.RunState.Rng.CombatTargets.NextInt(hand.Count)], CardPreviewStyle.None);
-                }
+            }
+            else
+            {
+                var card = await CardSelectCmd.FromHandForUpgrade(choiceContext, other, this);
+                if (card is not null)
+                    CardCmd.Upgrade(card);
             }
         }
 
@@ -320,9 +332,10 @@ public sealed class BlackLine  : AdriftCardTemplate
 
     protected override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay cardPlay)
     {
-        var hand = CardUtils.Hand(Owner);
-        if (hand is null || hand.Count == 0) return;
-        var selected = (await CardSelectCmd.FromHand(choiceContext, Owner, new CardSelectorPrefs(),
+        // 注意：CardSelectorPrefs 无参默认 MinSelect=MaxSelect=0，会导致选择界面无法选牌卡死；
+        // 必须显式指定选择 1 张 + 附魔提示
+        var selected = (await CardSelectCmd.FromHand(choiceContext, Owner,
+            new CardSelectorPrefs(CardSelectorPrefs.EnchantSelectionPrompt, 1),
             c => c != this, this)).FirstOrDefault();
         if (selected is not null)
             CardCmd.Enchant<PerfectFit>(selected, 1);
